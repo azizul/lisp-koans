@@ -49,8 +49,56 @@
 ;;;
 ;;; Your goal is to write the scoring function for Greed.
 
+;; using iteration to track multiple state is hard, better use
+;; hash table to store state changes; so the key would be the number
+;; then the value would be list of occurence of the the data
+;; for dice rolls; 
+;; '(1 1 2 1 1) => [1] = '(2, 2)
+;; '(2 1 1 1 1) => [1] = '(4)
+;; '(2 1 1 1 3) => [1] = '(3)
+;; '(1 2 3 4 5) => [1] = '()
 (defun score (&rest dice)
-  ____)
+  (let ((prev-roll 0)
+        (occurence 0)
+        (rolls 0)
+        (score 0)
+        (score_per_roll '())
+        (rolls-count (length dice)))
+    ;; empty rolls returns zero
+    (when (or (not dice) (= rolls-count 0))
+      (format t "empty rolls"))
+
+    (format t "dice:~d~&" dice)
+    (dolist (x dice)
+      (setf rolls (+ rolls 1))
+      (when (= x prev-roll)
+        (setf occurence (+ occurence 1)))
+      ;; reset occurence
+      (when (and (> rolls 1) (not (= x prev-roll)))
+        (setf occurence 0))
+      (format t "rolls:~d, occurence:~d, prev-roll:~d~%, current roll:~d~&" rolls occurence prev-roll x)
+      (when (and (= prev-roll 1) (= occurence 2))
+        (setf score (+ score 1000)))
+      (when (or (and (= prev-roll 1) (= occurence 0)) 
+                (and (= rolls rolls-count) (= x 1) (= occurence 0)))
+        (setf score (+ score 100)))
+      (when (and (= prev-roll 5) (= occurence 2))
+        (setf score (+ score 500)))
+      (when (or (and (= prev-roll 5) (= occurence 0)) 
+                (and (= rolls rolls-count) (= x 5) (= occurence 0)))
+        (setf score (+ score 50)))
+      (when (and (= prev-roll 2) (= occurence 3))
+        (setf score (+ score 200)))
+      (when (and (= prev-roll 3) (= occurence 3))
+        (setf score (+ score 300)))
+      (when (and (= prev-roll 4) (= occurence 3))
+        (setf score (+ score 400)))
+      (when (and (= prev-roll 6) (= occurence 3))
+        (setf score (+ score 600)))
+      (setf prev-roll x)
+      (format t "score:~d~&" score))
+    (format t "list score~d~&" (reduce #'+ score_per_roll))
+    score))
 
 (define-test score-of-an-empty-list-is-zero
   (assert-equal 0 (score)))
