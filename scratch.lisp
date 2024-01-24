@@ -121,7 +121,26 @@ test-var-a
 (score)
 (score 5)
 (score 1 5 5 1) ; 300
+(score 5 1 1 5) ; 300
 (score 2 3 4 6) ; 0 
-(score 5l 5 5) ; 500
+(score 5 5 5) ; 500
 (score 1 1 1) ; 1000
+(score 2 1 1) ; 200
+(score 2 2 2) ; 200
+(score 3 3 3) ; 300
+(score 4 4 4) ; 400
+(score 6 6 6) ; 600sc
 (format t "~c[2J" #\Esc)
+(format nil "~A evaluates to ~A"
+                             '(/ 24 (- 3 (/ 8 3)))
+                             (/ 24 (- 3 (/ 8 3))))
+(defparameter (form '(/ 24 (- 3 (/ 8 3))))
+        (result (/ 24 (- 3 (/ 8 3)))))
+
+(let ((form '(/ 24 (- 3 (/ 8 3))))
+      (result (/ 24 (- 3 (/ 8 3)))))
+  (format t "~B evaluates to ~B~&" form result)
+  (format t "~O evaluates to ~O~&" form result)
+  (format t "~D evaluates to ~D~&" form result)
+  (format t "~X evaluates to ~X~&" form result)
+  (format t "~3R evaluates to ~3R~&" form result))

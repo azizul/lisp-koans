@@ -57,7 +57,75 @@
 ;; '(2 1 1 1 1) => [1] = '(4)
 ;; '(2 1 1 1 3) => [1] = '(3)
 ;; '(1 2 3 4 5) => [1] = '()
+
+(defun score-once (&rest dice)
+  (let ((sorted (sort (copy-list dice) #'<)))
+    (cond ((search '(1 1 1) sorted) (list 1000 (remove 1 sorted :count 3)))
+          ((search '(2 2 2) sorted) (list 200 (remove 2 sorted :count 3)))
+          ((search '(3 3 3) sorted) (list 300 (remove 3 sorted :count 3)))
+          ((search '(4 4 4) sorted) (list 400 (remove 4 sorted :count 3)))
+          ((search '(5 5 5) sorted) (list 500 (remove 5 sorted :count 3)))
+          ((search '(6 6 6) sorted) (list 600 (remove 6 sorted :count 3)))
+          ((find 5 sorted) (list 50 (remove 5 sorted :count 1)))
+          ((find 1 sorted) (list 100 (remove 1 sorted :count 1)))
+          (t (list 0 '())))))
+
 (defun score (&rest dice)
+  (loop for current-dice = dice then remaining-dice
+        for (score remaining-dice) = (apply #'score-once current-dice)
+        sum score
+        while remaining-dice))
+
+(defun score_not_working (&rest dice)
+  (let ((states (make-hash-table :test 'equal))
+        (score 0)
+        (previous-roll 0))
+    ;; Get the occurence states
+    (dolist (x dice)
+      ;; for each roll, track the occurence of the data in a list of each
+      ;; dice value
+      (if (and (gethash states x) (equal x previous-roll))
+          ;; iterates for non-empty list
+          (dolist (value (gethash states x))
+            ;; maximum occurence is 3, else add new occurence in the list 
+            (setf (car value) (+ (car value) 1))
+            )
+          ;; else the initial empty list
+          (setf (gethash states x) '()))
+
+      ;; set previous rolls
+      (setf previous-roll x))
+    ;; count the states
+    (loop for key being the hash-keys of states
+          using (hash-value value)
+          do (format t "key: ~a value: ~a~%" key value)
+          ;;(progn 
+          ;;    ((format t "key: ~a value: ~a~%" key value)
+          ;;    (cond 
+          ;;     ;; for die = one
+          ;;     ((and (= key 1) (< (car value) 3)) 
+          ;;      (setf score (+ score (* value 100))))
+          ;;     ((and (= key 1) (= (car value) 3))
+          ;;      (setf score (+ score 1000)))
+          ;;     ((and (= key 1) (> (car value) 3))
+          ;;      (setf score (+ score (+ 1000 (* (- 5 (car value)) 100)))))
+          ;;     ;; for die = five
+          ;;     ((and (= key 5) (< (car value) 3))
+          ;;      (setf score (+ score (* value 50))))
+          ;;     ((and (= key 5) (= (car value) 3))
+          ;;      (setf score (+ score 500)))
+          ;;     ((and (= key 5) (> (car value) 3))
+          ;;      (setf score (+ score (+ 500 (* (- 5 (car value)) 50)))))
+          ;;     ;; for others
+          ;;     ((t)
+          ;;      (setf score (+ score (* (- 5 value) 100)))
+          ;;      )
+          ;;     )))
+          )
+    score)
+  )
+
+(defun score_hard (&rest dice)
   (let ((prev-roll 0)
         (occurence 0)
         (rolls 0)
@@ -73,28 +141,36 @@
       (setf rolls (+ rolls 1))
       (when (= x prev-roll)
         (setf occurence (+ occurence 1)))
-      ;; reset occurence
-      (when (and (> rolls 1) (not (= x prev-roll)))
-        (setf occurence 0))
       (format t "rolls:~d, occurence:~d, prev-roll:~d~%, current roll:~d~&" rolls occurence prev-roll x)
       (when (and (= prev-roll 1) (= occurence 2))
         (setf score (+ score 1000)))
       (when (or (and (= prev-roll 1) (= occurence 0)) 
-                (and (= rolls rolls-count) (= x 1) (= occurence 0)))
+                (and (= rolls rolls-count) (= x 1) (= occurence 0))
+                (and (= rolls rolls-count) (= x 1) (not (= x prev-roll)) (> occurence 0)))
         (setf score (+ score 100)))
+      (when (or (and (= prev-roll 1) (= occurence 1) (not (= x 1)))
+                (and (= rolls rolls-count) (= x prev-roll) (= x 1) (= occurence 1)))
+        (setf score (+ score (* 100 2))))
       (when (and (= prev-roll 5) (= occurence 2))
         (setf score (+ score 500)))
       (when (or (and (= prev-roll 5) (= occurence 0)) 
-                (and (= rolls rolls-count) (= x 5) (= occurence 0)))
+                (and (= rolls rolls-count) (= x 5) (= occurence 0))
+                (and (= rolls rolls-count) (= x 5) (not (= x prev-roll)) (> occurence 0)))
         (setf score (+ score 50)))
-      (when (and (= prev-roll 2) (= occurence 3))
+      (when (or (and (= prev-roll 5) (= occurence 1) (not (= x 5)))
+                (and (= rolls rolls-count) (= x 5) (= occurence 5)))
+        (setf score (+ score (* 50 2))))
+      (when (and (= prev-roll 2) (= occurence 2))
         (setf score (+ score 200)))
-      (when (and (= prev-roll 3) (= occurence 3))
+      (when (and (= prev-roll 3) (= occurence 2))
         (setf score (+ score 300)))
-      (when (and (= prev-roll 4) (= occurence 3))
+      (when (and (= prev-roll 4) (= occurence 2))
         (setf score (+ score 400)))
-      (when (and (= prev-roll 6) (= occurence 3))
+      (when (and (= prev-roll 6) (= occurence 2))
         (setf score (+ score 600)))
+      ;; reset occurence
+      (when (and (> rolls 1) (not (= x prev-roll)))
+        (setf occurence 0))
       (setf prev-roll x)
       (format t "score:~d~&" score))
     (format t "list score~d~&" (reduce #'+ score_per_roll))
