@@ -144,3 +144,305 @@ test-var-a
   (format t "~D evaluates to ~D~&" form result)
   (format t "~X evaluates to ~X~&" form result)
   (format t "~3R evaluates to ~3R~&" form result))
+
+(defvar jack (make-instance 'person :name :jack))
+(defvar bob (make-instance 'lisp-programmer
+                            :name :bob
+                            :favorite-lisp-implementation :sbcl))
+(defvar adam (make-instance 'c-programmer
+                             :name :adam
+                             :favorite-c-compiler :clang))
+(person-name jack)
+(person-name bob)
+(favorite-lisp-implementation bob)
+(person-name adam)
+(favorite-c-compiler adam)
+(defvar zenon (make-instance 'clisp-programmer
+                              :name :zenon
+                              :favorite-lisp-implementation :clisp
+                              :favorite-c-compiler :gcc))
+(typep zenon 'person)
+(typep zenon 'lisp-programmer)
+(typep zenon 'c-programmer)
+(typep zenon 'clisp-programmer)
+
+(defvar chatbot (make-instance 'greeting-chatbot :version "1.0.0"))
+(typep chatbot 'greeting-mixin)
+(typep chatbot 'chatbot)
+(typep chatbot 'greeting-chatbot)
+
+(defvar james (make-instance 'american))
+(defvar antonio (make-instance 'italian))
+(defvar roy (make-instance 'stereotypical-person))
+(defvar mary (make-instance 'another-stereotypical-person))
+
+
+;; implementing sort of DI method (before & after)
+;; accessor, reader and writer are generic method, hence we could use
+;; the implementation method with class specific to modify the values
+(defclass access-counter ()
+  ((value :accessor value :initarg :value)
+   (access-count :reader access-count :initform 0)))
+
+;; inject access count to value slot
+(defmethod value :after ((object access-counter))
+  (incf (slot-value object 'access-count)))
+
+(defvar counter (make-instance 'access-counter :value 0))
+(access-count counter) ; read the value access counter
+(value counter); read the value
+(setf (value counter) 24)
+
+
+;; defined an implementation of generic grab-lollipop
+(defgeneric grab-lollipop ()
+  (:method () :lollipop))
+;; defined a list of implementation with :around, which when exist
+;; executed first with the option to continue with original method
+(defgeneric grab-lollipop-while-mom-is-nearby (was-nice-p)
+  (:method :around (was-nice-p) (if was-nice-p (call-next-method) :no-lollipop))
+  (:method (was-nice-p) (declare (ignore was-nice-p)) :lollipop))
+
+
+(defclass countdown ()
+  ;; The countdown object represents an ongoing countdown. Each time the
+  ;; REMAINING-TIME function is called, it should return a number one less than
+  ;; the previous time that it returned. If the countdown hits zero, :BANG
+  ;; should be returned instead.
+  ((remaining-time :reader remaining-time :initarg :time)))
+
+(defmethod remaining-time :around ((object countdown))
+  (let ((time (call-next-method)))
+    (if (< 0 time)
+        ;; PROG1 returns the value of the first expression in the sequence.
+        ;; DECF is similar to INCF. It decreases the value stored in the place
+        ;; and returns the decreased value.
+        (prog1
+          time
+          (decf (slot-value object 'remaining-time)))
+        :bang)))
+
+(defvar countdown (make-instance 'countdown :time 4))
+
+(remaining-time countdown)
+(remaining-time countdown)
+(remaining-time countdown)
+(remaining-time countdown)
+(remaining-time countdown)
+(remaining-time countdown)
+
+
+(defvar object (make-instance 'object))
+;; actual initialization of generic methods to a specific class type, 
+;; for all the slots functions
+(frobnicate object) 
+(counter object)
+;; since the following object inherits object, the generic methods binded
+;; are all executed (subtype first, around, before, actual method, after)
+(defvar bigger-object (make-instance 'bigger-object))
+(frobnicate bigger-object) 
+(counter bigger-object)
+
+;; currently it seems we could use defgeneric as following
+;; 1. As a method switch-case based on parameters (call-next-method)
+;;    - method definition redefined the switch-case mechanism, either:
+;;      - "+" to indicate sum of addition according to class type
+;;      - "*" to indicate multiplaction based on type hierarchy
+;;      - "progn" to indicate list of programs execution
+;; 2. As a method declaration of generic function; requires defmethod to be 
+;;    declared specific to the generic method
+;; 3. As a "override" to the generated/macro definition of class slots functions
+;; 4. As DI for all the class slots functions call with the defgeneric called type,
+;;    in this case slot are not named in the defgeneric declaration
+
+
+(defgeneric calculate (x)
+  (:method :around ((x bigger-object))
+    (setf (counter x) 40)
+    (call-next-method))
+  (:method :around ((x object))
+    (incf (counter x) 24)
+    (call-next-method))
+  (:method :before ((x bigger-object))
+    (setf (counter x) (mod (counter x) 6)))
+  (:method :before ((x object))
+    (setf (counter x) (/ (counter x) 4)))
+  (:method ((x bigger-object))
+    (setf (counter x) (* (counter x) (counter x)))
+    (call-next-method))
+  (:method ((x object))
+    (decf (counter x) 100))
+  (:method :after ((x object))
+    (setf (counter x) (/ 1 (counter x))))
+  (:method :after ((x bigger-object))
+    (incf (counter x) 2)))
+
+(defvar calc-object (make-instance 'object))
+(defvar calc-bigger-object (make-instance 'bigger-object))
+(calculate calc-object)
+(counter calc-object)
+(calculate calc-bigger-object)
+(counter calc-bigger-object)
+
+
+;; condition object or define-condition seems to be similar to exception
+;; but more general class. Hence need to create via make-condition
+;; will use with handler-bind to associate condition with handler method,
+;; a function with condition definition as argument
+(define-condition my-condition () ())
+(define-condition my-warning (warning) ())
+(define-condition my-serious-condition (serious-condition) ())
+(define-condition my-error (error) ())
+(type-of var-condition)
+(class-of var-condition)
+(defvar var-condition (make-condition 'my-condition))
+(type-of var-condition)
+(class-of var-condition)
+(typep var-condition 'my-condition)
+(typep var-condition 'condition)
+(typep var-condition 'warning)
+(typep var-condition 'error))
+
+(defvar *list*)
+
+(define-condition silly-condition () ())
+
+(define-condition very-silly-condition (silly-condition) ())
+
+(define-condition most-silly-condition (very-silly-condition) ())
+
+(defun handle-silly-condition (condition)
+  (declare (ignore condition))
+  (push :silly-condition *list*))
+
+(defun handle-very-silly-condition (condition)
+  (declare (ignore condition))
+  (push :very-silly-condition *list*))
+
+(defun handle-most-silly-condition (condition)
+  (declare (ignore condition))
+  (push :most-silly-condition *list*))
+
+(let ((*list* '()))
+    (handler-bind ((very-silly-condition #'handle-very-silly-condition)
+                   (silly-condition #'handle-silly-condition)
+                   (most-silly-condition #'handle-most-silly-condition))
+      (signal (make-condition 'most-silly-condition)))
+    *list*)
+
+;; binding in sequence
+(let ((*list* '()))
+    (handler-bind ((silly-condition #'handle-silly-condition)
+                   (most-silly-condition #'handle-most-silly-condition))
+      (handler-bind ((very-silly-condition #'handle-very-silly-condition))
+        (signal (make-condition 'most-silly-condition))))
+    *list*)
+
+
+;; duplicate binding stills trigger
+(let ((*list* '()))
+    (handler-bind ((silly-condition #'handle-silly-condition)
+                   (silly-condition #'handle-silly-condition))
+      (handler-bind ((very-silly-condition #'handle-very-silly-condition)
+                     (silly-condition #'handle-silly-condition)
+                     (very-silly-condition #'handle-very-silly-condition))
+        (signal (make-condition 'most-silly-condition))))
+    *list*)
+
+;; signal condition has to match type hierarchy
+(let ((*list* '()))
+    (handler-bind ((silly-condition #'handle-silly-condition)
+                   (very-silly-condition #'handle-very-silly-condition)
+                   (most-silly-condition #'handle-most-silly-condition))
+      (signal (make-condition 'very-silly-condition)))
+     *list*)
+
+;; condition handler transfering control, i.e. to escape related condition handlers
+(let ((*list* '()))
+    (block my-block
+      (handler-bind ((silly-condition #'handle-silly-condition)
+                     (silly-condition (lambda (condition)
+                                        (declare (ignore condition))
+                                        (return-from my-block)))
+                     (silly-condition #'handle-silly-condition))
+        (signal (make-condition 'silly-condition))))
+    *list*)
+
+;; handler case is more like a try-catch block; where as when we use handler-bind
+;; the signal portion is triggered in the scope handler-bind is in; handler case
+;; handle in the scope of the handler-case block switching control to appropriate handler-bind
+(let ((*list* '()))
+  (handler-case (signal (make-condition 'my-error))
+    (error (condition) (handle-error condition))
+    (my-error (condition) (handle-my-error condition)))
+  *list*)
+
+;; handler-case orders matter
+(let ((*list* '()))
+    (handler-case (signal (make-condition 'my-error))
+      (my-error (condition) (handle-my-error condition))
+      (error (condition) (handle-error condition)))
+    *list*)
+
+;; case must match
+(let ((*list* '()))
+    (handler-case (signal (make-condition 'warning))
+      (my-error (condition) (handle-my-error condition))
+      (error (condition) (handle-error condition)))
+     *list*)
+
+
+(defun divide (numerator denominator)
+  (/ numerator denominator))
+
+(flet ((try-to-divide (numerator denominator)
+           ;; In code outside Lisp Koans, HANDLER-CASE should be used.
+           (handler-case (divide numerator denominator)
+             (division-by-zero () :division-by-zero)
+             (type-error () :type-error))))
+   (try-to-divide 6 2))
+   ;;(try-to-divide 6 0)
+  ;;  (try-to-divide 6 :zero))
+
+
+;; extractin meta data of the condition
+(let ((condition (handler-case (divide 6 0) (division-by-zero (c) c))))
+    (arithmetic-error-operands condition)) ;; operand raised by division-by-zero
+
+;; retrive back the function signed in the condition
+(let ((condition (handler-case (divide 6 0) (division-by-zero (c) c))))
+    (let ((operation (arithmetic-error-operation condition)))
+      (funcall operation 12 4)))
+
+;; retrieve meta data on type error: get the error operand
+(let ((condition (handler-case (divide 6 :zero) (type-error (c) c))))
+    (type-error-datum condition))
+
+;; retrieve the expected error operand
+(let ((condition (handler-case (divide 6 :zero) (type-error (c) c))))
+    (type-error-datum condition)
+    (let ((expected-type (type-error-expected-type condition)))
+      (class-of expected-type)))
+      ;;(typep :zero expected-type)))
+      ;;(typep 0 expected-type)
+      ;;(typep "zero" expected-type)
+      ;;(typep 0.0 expected-type)))
+
+
+;; condition with slots defined
+(define-condition parse-log-line-error (parse-error)
+  ((line :initarg :line :reader line)
+   (reason :initarg :reason :reader reason)))
+
+(defun log-line-type (line)
+  ;; The macro CHECK-TYPE signals a TYPE-ERROR if the object is not of the
+  ;; specified type.
+  (check-type line string)
+  (cond ((eql 0 (search "TIMESTAMP" line)) :timestamp)
+        ((eql 0 (search "HTTP" line)) :http)
+        ((eql 0 (search "LOGIN" line)) :login)
+        ;; The function ERROR should be used for signaling serious conditions
+        ;; and errors: if the condition is not handled, it halts program
+        ;; execution and starts the Lisp debugger.
+        (t (error 'parse-log-line-error :line line
+                                        :reason :unknown-log-line-type))))
