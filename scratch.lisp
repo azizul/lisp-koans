@@ -446,3 +446,101 @@ test-var-a
         ;; execution and starts the Lisp debugger.
         (t (error 'parse-log-line-error :line line
                                         :reason :unknown-log-line-type))))
+
+(defun triangle (a b c)
+  ;; Fill in the blank with a function that satisfies the below tests.
+ (let* ((min (min a b c))
+        (max (max a b c))
+        (mid (car (remove min (remove max (list a b c) :count 1) :count 1))))
+   (cond  ((= min mid max) :equilateral)
+          ((= min mid) :isosceles)
+          ((= min max) :isosceles)
+          (t :scalene)
+     )
+   ))
+(triangle 1 1 1)
+triangle
+(defvar x '(123))
+(defvar z '(7 8 9))
+
+(let ((variable 'x))
+  ;; Fill in the blank without using backquote/unquote notation.
+  (format t "~A"
+   `(if (typep ,variable 'string)
+        (format nil "The value of ~A is ~A" ',variable ,variable)
+        (error 'type-error :datum ,variable
+               :expected-type 'string)))
+  :COMPLETED)
+
+;;; even weirder since limit becomes 3 after macro
+;;; nreverse result is '(0 1 2 3)
+(macrolet ((for ((var start stop) &body body)
+               `(do ((,var ,start (1+ ,var))
+                     (limit ,stop))
+                    ((> ,var limit))
+                  ,@body)))
+    (let ((limit 10)
+          (result '()))
+      (for (i 0 3)
+           (push i result)
+           (format t "limit is : ~A~&" limit))
+      (format t "nreverse result is :~{~A~}"(nreverse result)))
+  :COMPLETED)
+
+;;; don't know how this work, since side effect are inserted 5 times
+;; both nreverse; result is '(0 1 2 3), side-effects is '(0 3 3 3 3 3)
+(macrolet ((for ((var start stop) &body body)
+               `(do ((,var ,start (1+ ,var)))
+                    ((> ,var ,stop))
+                  ,@body)))
+    (let ((side-effects '())
+          (result '()))
+      ;; Our functions RETURN-0 and RETURN-3 have side effects.
+      (flet ((return-0 () (push 0 side-effects) 0)
+             (return-3 () (push 3 side-effects) 3))
+        (for (i (return-0) (return-3))
+          (push i result)))
+      (format t "nreverse result is :~{~A ~}~&" (nreverse result))
+      (format t "nreverse sid-effects is :~{~A ~}~&" (nreverse side-effects))
+      :COMPLETED))
+
+;;; should say this doesn't respect macro subform evaluation order
+;;; both nreverse; result is '(0 1 2 3) and side-effects is '(3 0)
+(macrolet ((for ((var start stop) &body body)
+               ;; The function GENSYM creates GENerated SYMbols, guaranteed to
+               ;; be unique in the whole Lisp system. Because of that, they
+               ;; cannot capture other symbols, preventing variable capture.
+               (let ((limit (gensym "LIMIT")))
+                 `(do ((,limit ,stop)
+                       (,var ,start (1+ ,var)))
+                      ((> ,var ,limit))
+                    ,@body))))
+    (let ((side-effects '())
+          (result '()))
+      (flet ((return-0 () (push 0 side-effects) 0)
+             (return-3 () (push 3 side-effects) 3))
+        (for (i (return-0) (return-3))
+          (push i result)))
+      (format t "nreverse result is : ~{ ~A ~}~&" (nreverse result))
+      (format t "nreverse side-effects is : ~{ ~A ~}~&" (nreverse side-effects))
+      :COMPLETED))
+
+;;; the correct working one; fixing all the aboves
+;;; both nreverse; result is '(0 1 2 3) and side-effects is '(0 3)
+( macrolet ((for ((var start stop) &body body)
+              ;; Fill in the blank with a correct FOR macroexpansion that is
+              ;; not affected by the three macro pitfalls mentioned above.
+              (let ((limit (gensym "LIMIT")))
+                `(do ((,var ,start (1+ ,var))
+                      (,limit ,stop))
+                     ((> ,var ,limit))
+                   ,@body))))
+  (let ((side-effects '())
+        (result '()))
+    (flet ((return-0 () (push 0 side-effects) 0)
+           (return-3 () (push 3 side-effects) 3))
+      (for (i (return-0) (return-3))
+           (push i result)))
+    (format t "nreverse result is : ~{ ~A ~}~&" (nreverse result))
+    (format t "nreverse side-effects is : ~{ ~A ~}~&" (nreverse side-effects))
+    :COMPLETED))
