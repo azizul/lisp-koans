@@ -544,3 +544,71 @@ triangle
     (format t "nreverse result is : ~{ ~A ~}~&" (nreverse result))
     (format t "nreverse side-effects is : ~{ ~A ~}~&" (nreverse side-effects))
     :COMPLETED))
+
+(+ 1 2)
+(format t "test")
+
+(defclass color()
+  ((name 
+     :initarg :name 
+     :reader name)))
+
+;;(defmethod name ((object color))
+;;  (name color))
+
+(let* ((blue (make-instance 'color :name "blue"))
+      (red (make-instance 'color :name "red"))
+      (colors `(,blue ,red)))
+  (loop for color in colors
+        do (
+            ;;format t "color is ~A~&" (name (coerce i-color 'color))
+            ;;format t "type is ~A" (class-of i-color)
+            print (name color)
+            )))
+(true)
+(ql:quickload :bordeaux-threads)
+(require "bordeaux-threads")
+(let* ((thread (bt:make-thread (lambda () (+ 2 2)) :name "thread-calc")) (value (bt:join-thread thread)))
+  (value 
+  ;      (print value)
+  )
+
+(let ((thread (bt:make-thread #'+ :name "Summing Thread")))
+  (bt:join-thread thread))
+
+(let ((thread (bt:make-thread (lambda () (loop (sleep 1))))))
+  (print (bt:thread-alive-p thread))
+  (bt:destroy-thread thread)
+  (print (bt:thread-alive-p thread))
+  )
+
+(defvar *another-variable*)
+(defvar *lock* (bt:make-lock))
+
+(setf *ANOTHER-VARIABLE* 0)
+(flet ((increaser () (bt:with-lock-held (*LOCK*) (incf *ANOTHER-VARIABLE*))))
+  (loop repeat 100
+        collect (bt:make-thread #'increaser) into threads
+        finally (loop until (notany #'bt:thread-alive-p threads))))
+
+*ANOTHER-VARIABLE*
+
+(defvar *semaphore* (bt:make-semaphore))
+
+(defun signal-our-semaphore ()
+  (bt:signal-semaphore *semaphore*))
+
+(defun wait-on-our-semaphore ()
+  (bt:wait-on-semaphore *semaphore* :timeout 100))
+
+;; test semaphore calls
+(bt:join-thread (bt:make-thread #'signal-our-semaphore))
+(bt:join-thread (bt:make-thread #'signal-our-semaphore))
+(bt:join-thread (bt:make-thread #'signal-our-semaphore))
+(bt:join-thread (bt:make-thread #'wait-on-our-semaphore))
+(bt:join-thread (bt:make-thread #'wait-on-our-semaphore))
+(bt:join-thread (bt:make-thread #'wait-on-our-semaphore))
+(bt:join-thread (bt:make-thread #'wait-on-our-semaphore))
+
+(load "contemplate.lisp")
+
